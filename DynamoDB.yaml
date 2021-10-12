@@ -1,0 +1,150 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Resources for DynamoDB and Access Role
+Parameters:
+  stage:
+    Type: String
+    Description: The stage for this resource (e.g. nonprod, preprod, prod)
+    Default: nonprod
+  # LambdaPermissionBoundaryArn:
+  #   Type: String
+  #   Description: The permission boundary ARN for the Lambda execution role
+  BasePolicyArn:
+    Type: String
+    Description: The base policy ARN for ECS tasks
+    Default: arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  dbSecretArn:
+    Type: String
+    Description: The secret ARN for the application	
+    Default: arn:aws:secretsmanager:us-east-1:080142491539:secret:prod/glue-demo/posegresql-Tqopdn
+Conditions:
+  CreateIAMResources: !Not [!Equals [!Ref stage, 'prod']]
+Resources:
+  AppTargetRole:
+    Type: AWS::IAM::Role
+    Condition: CreateIAMResources
+    Properties:
+      RoleName: !Sub 'lfg-lambda-dynamodb-execution-role-${stage}'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Description: !Sub 'Application execution role for the lambda dunction for the ${stage} environment.'
+      ManagedPolicyArns:
+        - !Ref BasePolicyArn
+      # PermissionsBoundary: !Ref LambdaPermissionBoundaryArn
+      Policies:
+        - PolicyName: lfg-lambda-dynamodb-execution-inline-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:BatchGetItem
+                  - dynamodb:BatchWriteItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:UpdateItem
+                Resource:
+                  - !GetAtt IDMDomainTable.Arn
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref dbSecretArn
+      Tags:
+        - Key: env
+          Value: !Ref stage
+        - Key: team
+          Value: 'ites-ent-pltfm'
+        - Key: app
+          Value: 'ENT - IDM'
+
+  IDMDomainTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'lfg-ent-email-domain-${stage}'
+      AttributeDefinitions: # A list of attributes that describe the key schema for the table and indexes
+        - AttributeName: allowed_key  # The name of a key attribute.
+          AttributeType: S  # S - the attribute is of type String , N - the attribute is of type Number, B - the attribute is of type Binary
+      KeySchema: # Specifies the attributes that make up the primary key for the table. The attributes in the KeySchema property must also be defined in the AttributeDefinitions property.
+        - AttributeName: allowed_key
+          KeyType: HASH # The role that this key attribute will assume: HASH - partition key ; RANGE - sort key
+      SSESpecification:
+        # KMSMasterKeyId: 'arn:aws:kms:us-east-1:481394232343:key/b5f4819e-c0d8-48fc-9842-a208bdeb816e'
+        SSEEnabled: false # If enabled (true), server-side encryption type is set to KMS and an AWS managed CMK is used
+        # SSEType: KMS
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1 # The maximum number of strongly consistent reads consumed per second before DynamoDB returns a ThrottlingException
+        WriteCapacityUnits: 1 # The maximum number of writes consumed per second before DynamoDB returns a ThrottlingException
+      PointInTimeRecoverySpecification: 
+        PointInTimeRecoveryEnabled: true # Indicates whether point in time recovery is enabled (true) or disabled (false) on the table
+      TimeToLiveSpecification:
+        AttributeName: expirationTime # The name of the TTL attribute used to store the expiration time for items in the table.
+        Enabled: true
+      Tags:
+        - Key: env
+          Value: !Ref stage
+        - Key: team
+          Value: 'ites-ent-pltfm'
+        - Key: app
+          Value: 'ENT - IDM'
+        - Key: dbms
+          Value: 'dynamodb'
+
+  IDMDomainTableWriteCapacityScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 2
+      MinCapacity: 1
+      ResourceId: !Sub 'table/lfg-ent-email-domain-${stage}'
+      RoleARN: !Sub 'arn:aws:iam::${AWS::AccountId}:role/AWSServiceRoleForApplicationAutoScaling_DynamoDBTable'
+      ScalableDimension: dynamodb:table:WriteCapacityUnits # The scalable dimension associated with the scalable target. This string consists of the service namespace, resource type, and scaling property.
+      ServiceNamespace: dynamodb # The namespace of the AWS service that provides the resource (Allowed values: appstream | cassandra | comprehend | custom-resource | dynamodb | ec2 | ecs , etc)
+    DependsOn: IDMDomainTable
+
+  IDMDomainTableWriteScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: WriteAutoScalingPolicy
+      PolicyType: TargetTrackingScaling # TargetTrackingScaling—Not supported for Amazon EMR ; StepScaling—Not supported for DynamoDB, Amazon Comprehend, Lambda, or Amazon Keyspaces 
+      ScalingTargetId: !Ref IDMDomainTableWriteCapacityScalableTarget
+      TargetTrackingScalingPolicyConfiguration: # A target tracking scaling policy
+        TargetValue: 50 # The target value for the metric.
+        ScaleInCooldown: 60 # The amount of time, in seconds, With the scale-in cooldown period, the intention is to scale in conservatively to protect your application’s availability, so scale-in activities are blocked until the cooldown period has expired
+        ScaleOutCooldown: 60 # The amount of time, in seconds, to wait for a previous scale-out activity to take effect.
+        PredefinedMetricSpecification: # A predefined metric. You can specify either a predefined metric or a customized metric.
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
+    DependsOn: IDMDomainTableWriteCapacityScalableTarget
+
+  IDMDomainTableReadCapacityScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 2
+      MinCapacity: 1
+      ResourceId: !Sub 'table/lfg-ent-email-domain-${stage}'
+      RoleARN: !Sub 'arn:aws:iam::${AWS::AccountId}:role/AWSServiceRoleForApplicationAutoScaling_DynamoDBTable'
+      ScalableDimension: dynamodb:table:ReadCapacityUnits
+      ServiceNamespace: dynamodb
+    DependsOn: IDMDomainTable
+
+  IDMDomainTableReadScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: ReadAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref IDMDomainTableReadCapacityScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 50
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
+    DependsOn: IDMDomainTableReadCapacityScalableTarget
