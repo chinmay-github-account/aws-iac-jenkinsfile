@@ -19,53 +19,53 @@ Parameters:
 Conditions:
   CreateIAMResources: !Not [!Equals [!Ref stage, 'prod']]
 Resources:
-  AppTargetRole:
-    Type: AWS::IAM::Role
-    Condition: CreateIAMResources
-    Properties:
-      RoleName: !Sub 'lfg-lambda-dynamodb-execution-role-${stage}'
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - sts:AssumeRole
-      Description: !Sub 'Application execution role for the lambda dunction for the ${stage} environment.'
-      ManagedPolicyArns:
-        - !Ref BasePolicyArn
-      # PermissionsBoundary: !Ref LambdaPermissionBoundaryArn
-      Policies:
-        - PolicyName: lfg-lambda-dynamodb-execution-inline-policy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - dynamodb:BatchGetItem
-                  - dynamodb:BatchWriteItem
-                  - dynamodb:DeleteItem
-                  - dynamodb:GetItem
-                  - dynamodb:PutItem
-                  - dynamodb:Query
-                  - dynamodb:Scan
-                  - dynamodb:UpdateItem
-                Resource:
-                  - !GetAtt IDMDomainTable.Arn
-              - Effect: Allow
-                Action:
-                  - secretsmanager:GetSecretValue
-                Resource:
-                  - !Ref dbSecretArn
-      Tags:
-        - Key: env
-          Value: !Ref stage
-        - Key: team
-          Value: 'ites-ent-pltfm'
-        - Key: app
-          Value: 'ENT - IDM'
+  # AppTargetRole:
+  #   Type: AWS::IAM::Role
+  #   Condition: CreateIAMResources
+  #   Properties:
+  #     RoleName: !Sub 'lfg-lambda-dynamodb-execution-role-${stage}'
+  #     AssumeRolePolicyDocument:
+  #       Version: 2012-10-17
+  #       Statement:
+  #         - Effect: Allow
+  #           Principal:
+  #             Service:
+  #               - lambda.amazonaws.com
+  #           Action:
+  #             - sts:AssumeRole
+  #     Description: !Sub 'Application execution role for the lambda dunction for the ${stage} environment.'
+  #     ManagedPolicyArns:
+  #       - !Ref BasePolicyArn
+  #     # PermissionsBoundary: !Ref LambdaPermissionBoundaryArn
+  #     Policies:
+  #       - PolicyName: lfg-lambda-dynamodb-execution-inline-policy
+  #         PolicyDocument:
+  #           Version: 2012-10-17
+  #           Statement:
+  #             - Effect: Allow
+  #               Action:
+  #                 - dynamodb:BatchGetItem
+  #                 - dynamodb:BatchWriteItem
+  #                 - dynamodb:DeleteItem
+  #                 - dynamodb:GetItem
+  #                 - dynamodb:PutItem
+  #                 - dynamodb:Query
+  #                 - dynamodb:Scan
+  #                 - dynamodb:UpdateItem
+  #               Resource:
+  #                 - !GetAtt IDMDomainTable.Arn
+  #             - Effect: Allow
+  #               Action:
+  #                 - secretsmanager:GetSecretValue
+  #               Resource:
+  #                 - !Ref dbSecretArn
+  #     Tags:
+  #       - Key: env
+  #         Value: !Ref stage
+  #       - Key: team
+  #         Value: 'ites-ent-pltfm'
+  #       - Key: app
+  #         Value: 'ENT - IDM'
 
   IDMDomainTable:
     Type: AWS::DynamoDB::Table
