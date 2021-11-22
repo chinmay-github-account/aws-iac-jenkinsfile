@@ -28,6 +28,7 @@ pipeline {
         stage('Test') {
             steps {		
                 echo 'Testing..'
+		sleep 30
 		    sh "aws cloudformation create-change-set --change-set-name ${CloudFormation_ChangeSetName} --change-set-type CREATE --stack-name ${CloudFormation_StackName} --region us-east-1 --template-body file://DynamoDB.yaml --tags Key=Application_Name,Value=${APP_NAME} --role-arn ${CloudFormation_Role} --capabilities CAPABILITY_NAMED_IAM"
             }
         }
