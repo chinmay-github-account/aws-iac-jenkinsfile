@@ -27,7 +27,7 @@ pipeline {
         }
         stage('Test') {
             steps {		
-                echo 'Testing..'
+                echo 'Testing..Sleep 30 Sec'
 		sleep 30
 		    sh "aws cloudformation create-change-set --change-set-name ${CloudFormation_ChangeSetName} --change-set-type CREATE --stack-name ${CloudFormation_StackName} --region us-east-1 --template-body file://DynamoDB.yaml --tags Key=Application_Name,Value=${APP_NAME} --role-arn ${CloudFormation_Role} --capabilities CAPABILITY_NAMED_IAM"
             }
@@ -35,6 +35,7 @@ pipeline {
         stage('Deploy') {
             steps {		
                 echo 'Deploying....'
+		sleep 30
 		    sh "aws cloudformation execute-change-set --stack-name ${CloudFormation_StackName} --change-set-name ${CloudFormation_ChangeSetName} --region us-east-1"
 		echo 'Verifying....'
 		    sh "aws cloudformation wait stack-create-complete --stack-name ${CloudFormation_StackName} --region us-east-1"
