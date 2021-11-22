@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Resources for DynamoDB and Access Role
+Description: Resources for AWS DynamoDB and Access Role
 Parameters:
   stage:
     Type: String
